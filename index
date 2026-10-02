@@ -3,318 +3,172 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coordenadas GPS y Mapa Interactivo</title>
+    <title>GPS y Captura de Coordenadas</title>
     
-    <!-- Tailwind CSS CDN -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Leaflet CSS & JS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-
     <style>
         #map {
+            height: 100vh;
+            width: 100vw;
             z-index: 1;
-        }
-        .custom-popup .leaflet-popup-content-wrapper {
-            background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-            padding: 4px;
-        }
-        .pulse-marker {
-            box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
-            animation: pulse 1.5s infinite;
-        }
-        @keyframes pulse {
-            0% {
-                transform: scale(0.95);
-                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
-            }
-            70% {
-                transform: scale(1);
-                box-shadow: 0 0 0 10px rgba(59, 130, 246, 0);
-            }
-            100% {
-                transform: scale(0.95);
-                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
-            }
         }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-100 flex flex-col h-screen overflow-hidden font-sans">
+<body class="bg-gray-100 font-sans antialiased overflow-hidden">
 
-    <!-- Header -->
-    <header class="bg-slate-800 border-b border-slate-700 p-4 shadow-md z-10 flex items-center justify-between">
-        <div class="flex items-center space-x-3">
-            <div class="p-2 bg-blue-600 rounded-lg">
-                <i data-lucide="map-pin" class="w-6 h-6 text-white"></i>
-            </div>
-            <div>
-                <h1 class="text-lg font-bold leading-tight text-white">GeoPicker</h1>
-                <p class="text-xs text-slate-400">Captura de Coordenadas GPS</p>
-            </div>
-        </div>
+    <!-- Contenedor del Mapa -->
+    <div id="map"></div>
+
+    <!-- Panel Flotante de Coordenadas -->
+    <div class="fixed bottom-6 right-6 z-[1000] bg-white/95 backdrop-blur-md p-5 rounded-2xl shadow-2xl border border-gray-100 max-w-xs sm:max-w-sm w-full transition-all">
+        <h2 class="text-xs uppercase tracking-wider font-bold text-gray-400 mb-2">Punto Seleccionado</h2>
         
-        <!-- Botón GPS Re-centrar -->
-        <button id="btn-recenter" class="flex items-center space-x-2 bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-slate-200 px-3 py-2 rounded-lg text-sm font-medium transition duration-200 border border-slate-600 shadow-sm">
-            <i data-lucide="crosshair" class="w-4 h-4 text-blue-400"></i>
-            <span class="hidden sm:inline">Mi Ubicación</span>
-        </button>
-    </header>
-
-    <!-- Main Container -->
-    <main class="relative flex-1 w-full h-full">
-        <!-- Contenedor del Mapa -->
-        <div id="map" class="w-full h-full"></div>
-
-        <!-- Panel de Coordenadas (Flotante / Responsivo) -->
-        <div class="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-6 sm:bottom-6 sm:w-96 z-20 pointer-events-auto">
-            <div class="bg-slate-800/95 backdrop-blur-md border border-slate-700 p-5 rounded-2xl shadow-2xl flex flex-col gap-4">
-                
-                <div class="flex items-center justify-between border-b border-slate-700/80 pb-3">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                        <i data-lucide="navigation" class="w-3.5 h-3.5 text-blue-400"></i>
-                        Punto Seleccionado
-                    </span>
-                    <span id="status-badge" class="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-medium border border-blue-500/30">
-                        GPS Activo
-                    </span>
-                </div>
-
-                <!-- Campos de coordenadas -->
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/50">
-                        <span class="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Latitud</span>
-                        <span id="lat-val" class="text-base font-mono font-bold text-slate-100 select-all">--.--</span>
-                    </div>
-                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-700/50">
-                        <span class="block text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Longitud</span>
-                        <span id="lng-val" class="text-base font-mono font-bold text-slate-100 select-all">--.--</span>
-                    </div>
-                </div>
-
-                <!-- Botón para copiar coordenadas -->
-                <button id="btn-copy" class="w-full bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-medium py-3 px-4 rounded-xl flex items-center justify-center space-x-2 transition-all duration-200 shadow-lg shadow-blue-600/25">
-                    <i data-lucide="copy" class="w-4 h-4"></i>
-                    <span id="copy-text">Copiar Coordenadas</span>
-                </button>
+        <div class="space-y-1.5 mb-4">
+            <div class="flex justify-between items-center text-gray-700">
+                <span class="text-xs font-semibold">Latitud:</span>
+                <span id="lat" class="font-mono text-sm font-bold text-gray-900">-</span>
+            </div>
+            <div class="flex justify-between items-center text-gray-700">
+                <span class="text-xs font-semibold">Longitud:</span>
+                <span id="lng" class="font-mono text-sm font-bold text-gray-900">-</span>
             </div>
         </div>
-    </main>
 
-    <!-- Notification Toast -->
-    <div id="toast" class="fixed top-20 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white border border-slate-600 px-4 py-2.5 rounded-xl shadow-xl z-50 flex items-center space-x-2 opacity-0 pointer-events-none transition-all duration-300">
-        <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400"></i>
-        <span id="toast-msg" class="text-sm font-medium">¡Coordenadas copiadas!</span>
+        <button id="copy-btn" onclick="copyCoordinates()" disabled
+            class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-xl shadow-md transition-all duration-200 flex items-center justify-center space-x-2 text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+            </svg>
+            <span id="btn-text">Copiar Coordenadas</span>
+        </button>
     </div>
 
+    <!-- Botón Flotante para Recentrar GPS -->
+    <button onclick="recenterGPS()" 
+        class="fixed top-6 right-6 z-[1000] bg-white p-3 rounded-full shadow-lg border border-gray-200 text-gray-700 hover:text-blue-600 hover:shadow-xl transition-all active:scale-95" 
+        title="Mi Ubicación GPS">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+    </button>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
-        // Inicializar iconos Lucide
-        lucide.createIcons();
+        // Coordenadas iniciales por defecto
+        let currentLat = -33.4489;
+        let currentLng = -70.6693;
+        let userLocation = null;
+        let activeMarker = null;
 
-        // Variables del mapa y marcadores
-        let map;
-        let selectedMarker = null;
-        let userLocationMarker = null;
-        let currentCoords = { lat: 0, lng: 0 };
-        
-        // Coordenada por defecto (Santiago, Chile) si falla la geolocalización inicial
-        const defaultCoords = [-33.4489, -70.6693];
+        // Inicializar el mapa
+        const map = L.map('map', {
+            zoomControl: false
+        }).setView([currentLat, currentLng], 13);
 
-        // Elementos de la interfaz DOM
-        const latValEl = document.getElementById('lat-val');
-        const lngValEl = document.getElementById('lng-val');
-        const btnCopy = document.getElementById('btn-copy');
-        const copyText = document.getElementById('copy-text');
-        const btnRecenter = document.getElementById('btn-recenter');
-        const toast = document.getElementById('toast');
-        const statusBadge = document.getElementById('status-badge');
+        // Control de Zoom
+        L.control.zoom({ position: 'topleft' }).addTo(map);
 
-        function initMap() {
-            // Crear el mapa de Leaflet
-            map = L.map('map', {
-                zoomControl: false // Ocultar control de zoom por defecto para reubicarlo si es necesario
-            }).setView(defaultCoords, 13);
+        // Capa Mapa Estándar (CartoDB Voyager)
+        const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20,
+            referrerPolicy: 'strict-origin-when-cross-origin'
+        });
 
-            // Agregar control de zoom en una mejor posición
-            L.control.zoom({ position: 'topright' }).addTo(map);
+        // Capa Satelital (Esri World Imagery)
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+            maxZoom: 18,
+            referrerPolicy: 'strict-origin-when-cross-origin'
+        });
 
-            // Capa de mosaicos (OpenStreetMap)
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            }).addTo(map);
+        // Añadir capa por defecto al mapa
+        streetLayer.addTo(map);
 
-            // Obtener ubicación GPS actual al cargar
-            getUserLocation(true);
+        // Control para alternar entre Mapa y Satélite
+        const baseMaps = {
+            "Mapa": streetLayer,
+            "Satélite": satelliteLayer
+        };
+        L.control.layers(baseMaps, null, { position: 'topleft' }).addTo(map);
 
-            // Evento de clic en el mapa para colocar pin
-            map.on('click', function(e) {
-                const { lat, lng } = e.latlng;
-                setSelectedLocation(lat, lng);
+        // Estilo del marcador de posición GPS
+        const userIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background-color: #2563eb; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
+        });
+
+        // Obtener Geolocalización GPS del usuario
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(position => {
+                const { latitude, longitude } = position.coords;
+                userLocation = [latitude, longitude];
+                
+                map.setView(userLocation, 16);
+                
+                L.marker(userLocation, { icon: userIcon }).addTo(map)
+                    .bindPopup("Tu ubicación actual")
+                    .openPopup();
+
+                updateSelectedPoint(latitude, longitude);
+            }, error => {
+                console.warn("Acceso a GPS denegado o no disponible:", error.message);
+            }, { enableHighAccuracy: true });
+        }
+
+        // Selección de un punto al hacer clic en el mapa
+        map.on('click', function(e) {
+            const { lat, lng } = e.latlng;
+            updateSelectedPoint(lat, lng);
+        });
+
+        // Actualizar datos del punto seleccionado
+        function updateSelectedPoint(lat, lng) {
+            currentLat = lat.toFixed(6);
+            currentLng = lng.toFixed(6);
+
+            document.getElementById('lat').innerText = currentLat;
+            document.getElementById('lng').innerText = currentLng;
+            document.getElementById('copy-btn').disabled = false;
+
+            if (activeMarker) {
+                activeMarker.setLatLng([lat, lng]);
+            } else {
+                activeMarker = L.marker([lat, lng]).addTo(map);
+            }
+        }
+
+        // Centrar en la ubicación GPS
+        function recenterGPS() {
+            if (userLocation) {
+                map.flyTo(userLocation, 16);
+                updateSelectedPoint(userLocation[0], userLocation[1]);
+            } else {
+                alert("Ubicación GPS no disponible o falta autorización.");
+            }
+        }
+
+        // Copiar Coordenadas al Portapapeles
+        function copyCoordinates() {
+            const textToCopy = `${currentLat}, ${currentLng}`;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const btnText = document.getElementById('btn-text');
+                btnText.innerText = '¡Copiado!';
+                setTimeout(() => {
+                    btnText.innerText = 'Copiar Coordenadas';
+                }, 2000);
             });
         }
-
-        function getUserLocation(isInitial = false) {
-            if ("geolocation" in navigator) {
-                statusBadge.textContent = "Buscando GPS...";
-                statusBadge.className = "text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-medium border border-amber-500/30";
-
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const { latitude, longitude } = position.coords;
-                        
-                        statusBadge.textContent = "GPS Activo";
-                        statusBadge.className = "text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium border border-emerald-500/30";
-
-                        // Crear o actualizar el marcador de posición del usuario (icono azul de pulso)
-                        if (userLocationMarker) {
-                            userLocationMarker.setLatLng([latitude, longitude]);
-                        } else {
-                            const userIcon = L.divIcon({
-                                className: 'relative flex items-center justify-center',
-                                html: `
-                                    <span class="absolute w-4 h-4 bg-blue-500 rounded-full pulse-marker"></span>
-                                    <span class="relative w-3 h-3 bg-blue-600 rounded-full border-2 border-white"></span>
-                                `,
-                                iconSize: [16, 16],
-                                iconAnchor: [8, 8]
-                            });
-
-                            userLocationMarker = L.marker([latitude, longitude], { icon: userIcon })
-                                .addTo(map)
-                                .bindPopup("<b>Tu ubicación actual</b>");
-                        }
-
-                        // Si es la carga inicial o si presiona el botón, re-centramos y seleccionamos la coordenada
-                        map.flyTo([latitude, longitude], 16, { animate: true, duration: 1.2 });
-                        setSelectedLocation(latitude, longitude);
-                    },
-                    (error) => {
-                        console.warn("Error obteniendo ubicación GPS:", error.message);
-                        statusBadge.textContent = "GPS No disponible";
-                        statusBadge.className = "text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-medium border border-rose-500/30";
-                        
-                        if (isInitial) {
-                            // Si falla al inicio, usar coordenadas por defecto
-                            setSelectedLocation(defaultCoords[0], defaultCoords[1]);
-                        }
-                        showToast("No se pudo obtener el GPS. Selecciona un punto manualmente.", true);
-                    },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
-            } else {
-                showToast("Tu navegador no soporta geolocalización.", true);
-                setSelectedLocation(defaultCoords[0], defaultCoords[1]);
-            }
-        }
-
-        function setSelectedLocation(lat, lng) {
-            currentCoords = { lat: lat.toFixed(6), lng: lng.toFixed(6) };
-
-            // Actualizar vista DOM
-            latValEl.textContent = currentCoords.lat;
-            lngValEl.textContent = currentCoords.lng;
-
-            // Mover o crear el marcador rojo de selección
-            if (selectedMarker) {
-                selectedMarker.setLatLng([lat, lng]);
-            } else {
-                // Crear un icono personalizado rojo para el punto seleccionado
-                const selectIcon = L.divIcon({
-                    className: 'custom-pin',
-                    html: `
-                        <div class="text-rose-500 drop-shadow-md">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="currentColor" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-                                <circle cx="12" cy="10" r="3" fill="white"/>
-                            </svg>
-                        </div>
-                    `,
-                    iconSize: [32, 32],
-                    iconAnchor: [16, 32]
-                });
-
-                selectedMarker = L.marker([lat, lng], { icon: selectIcon }).addTo(map);
-            }
-        }
-
-        function copyToClipboard() {
-            if (!currentCoords.lat || !currentCoords.lng) return;
-
-            const coordText = `${currentCoords.lat}, ${currentCoords.lng}`;
-
-            // Usar execCommand o Clipboard API de forma segura
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(coordText)
-                    .then(() => triggerCopyFeedback())
-                    .catch(() => fallbackCopy(coordText));
-            } else {
-                fallbackCopy(coordText);
-            }
-        }
-
-        function fallbackCopy(text) {
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.position = "fixed";
-            textArea.style.opacity = "0";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            try {
-                document.execCommand('copy');
-                triggerCopyFeedback();
-            } catch (err) {
-                showToast("Error al copiar al portapapeles", true);
-            }
-            document.body.removeChild(textArea);
-        }
-
-        function triggerCopyFeedback() {
-            // Cambiar estilos y texto del botón temporalmente
-            btnCopy.classList.remove('bg-blue-600', 'hover:bg-blue-500');
-            btnCopy.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
-            copyText.textContent = "¡Copiado!";
-            
-            showToast("Coordenadas copiadas al portapapeles");
-
-            setTimeout(() => {
-                btnCopy.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
-                btnCopy.classList.add('bg-blue-600', 'hover:bg-blue-500');
-                copyText.textContent = "Copiar Coordenadas";
-            }, 2000);
-        }
-
-        function showToast(message, isError = false) {
-            const toastMsg = document.getElementById('toast-msg');
-            toastMsg.textContent = message;
-            
-            if (isError) {
-                toast.classList.add('border-rose-500');
-            } else {
-                toast.classList.remove('border-rose-500');
-            }
-
-            toast.classList.remove('opacity-0', 'pointer-events-none');
-            toast.classList.add('opacity-100');
-
-            setTimeout(() => {
-                toast.classList.remove('opacity-100');
-                toast.classList.add('opacity-0', 'pointer-events-none');
-            }, 3000);
-        }
-
-        // Event Listeners
-        btnCopy.addEventListener('click', copyToClipboard);
-        btnRecenter.addEventListener('click', () => getUserLocation(false));
-
-        // Inicializar mapa al cargar la página
-        window.onload = initMap;
     </script>
 </body>
 </html>
