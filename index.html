@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPS y Captura de Coordenadas</title>
+    <title>GPS, Senderos y Transporte</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -61,43 +61,50 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
-        // Coordenadas iniciales por defecto
         let currentLat = -33.4489;
         let currentLng = -70.6693;
         let userLocation = null;
         let activeMarker = null;
 
-        // Inicializar el mapa de Leaflet
         const map = L.map('map', {
             zoomControl: false
-        }).setView([currentLat, currentLng], 13);
+        }).setView([currentLat, currentLng], 15);
 
-        // Control de Zoom
         L.control.zoom({ position: 'topleft' }).addTo(map);
 
-        // Capa de Calle Estándar (Esri World Street Map - Sin API key requerida)
-        const streetLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012',
-            maxZoom: 19
+        // Capa OSM Francia (Muestra senderos peatonales, paradas de bus y detalles urbanos sin bloqueo de API)
+        const pedestrianLayer = L.tileLayer('https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap France | &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 20,
+            referrerPolicy: 'strict-origin-when-cross-origin'
         });
 
-        // Capa Satelital (Esri World Imagery)
+        // Capa CyclOSM (Especializada en pasajes peatonales, ciclovías y transporte público)
+        const cycloLayer = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.cyclosm.org">CyclOSM</a> | &copy; OpenStreetMap contributors',
+            maxZoom: 20,
+            referrerPolicy: 'strict-origin-when-cross-origin'
+        });
+
+        // Capa Satelital Esri
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-            maxZoom: 18
+            attribution: 'Tiles &copy; Esri',
+            maxZoom: 18,
+            referrerPolicy: 'strict-origin-when-cross-origin'
         });
 
-        // Añadir mapa de calles por defecto
-        streetLayer.addTo(map);
+        // Cargar por defecto la capa de peatones y transporte
+        pedestrianLayer.addTo(map);
 
-        // Control nativo de capas de Leaflet (para cambiar entre mapa y satélite)
+        // Control de capas para alternar mapas
         const baseMaps = {
-            "Mapa Calles": streetLayer,
+            "Peatonal / Transporte": pedestrianLayer,
+            "Ciclovías y Senderos": cycloLayer,
             "Satelital": satelliteLayer
         };
         L.control.layers(baseMaps, null, { position: 'topleft' }).addTo(map);
 
-        // Estilo del marcador para la ubicación GPS
+        // Estilo del punto GPS
         const userIcon = L.divIcon({
             className: 'custom-div-icon',
             html: `<div style="background-color: #2563eb; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
@@ -105,7 +112,7 @@
             iconAnchor: [9, 9]
         });
 
-        // Obtenemos la posición GPS del usuario
+        // Obtener Geolocalización
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(position => {
                 const { latitude, longitude } = position.coords;
@@ -123,13 +130,12 @@
             }, { enableHighAccuracy: true });
         }
 
-        // Selección de un punto haciendo clic sobre el mapa
+        // Selección de punto en el mapa
         map.on('click', function(e) {
             const { lat, lng } = e.latlng;
             updateSelectedPoint(lat, lng);
         });
 
-        // Función para actualizar coordenadas en pantalla y posicionar el marcador
         function updateSelectedPoint(lat, lng) {
             currentLat = lat.toFixed(6);
             currentLng = lng.toFixed(6);
@@ -145,17 +151,15 @@
             }
         }
 
-        // Función del botón para volver a la posición GPS del usuario
         function recenterGPS() {
             if (userLocation) {
                 map.flyTo(userLocation, 16);
                 updateSelectedPoint(userLocation[0], userLocation[1]);
             } else {
-                alert("Ubicación GPS no disponible o no has otorgado permisos.");
+                alert("Ubicación GPS no disponible o falta autorización.");
             }
         }
 
-        // Función para copiar coordenadas al portapapeles
         function copyCoordinates() {
             const textToCopy = `${currentLat}, ${currentLng}`;
             navigator.clipboard.writeText(textToCopy).then(() => {
