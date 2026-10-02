@@ -67,7 +67,7 @@
         let userLocation = null;
         let activeMarker = null;
 
-        // Inicializar el mapa
+        // Inicializar el mapa de Leaflet
         const map = L.map('map', {
             zoomControl: false
         }).setView([currentLat, currentLng], 13);
@@ -75,32 +75,29 @@
         // Control de Zoom
         L.control.zoom({ position: 'topleft' }).addTo(map);
 
-        // Capa Mapa Estándar (CartoDB Voyager)
-        const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-            subdomains: 'abcd',
-            maxZoom: 20,
-            referrerPolicy: 'strict-origin-when-cross-origin'
+        // Capa de Calle Estándar (Esri World Street Map - Sin API key requerida)
+        const streetLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, DeLorme, NAVTEQ, USGS, Intermap, iPC, NRCAN, Esri Japan, METI, Esri China (Hong Kong), Esri (Thailand), TomTom, 2012',
+            maxZoom: 19
         });
 
         // Capa Satelital (Esri World Imagery)
         const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
             attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-            maxZoom: 18,
-            referrerPolicy: 'strict-origin-when-cross-origin'
+            maxZoom: 18
         });
 
-        // Añadir capa por defecto al mapa
+        // Añadir mapa de calles por defecto
         streetLayer.addTo(map);
 
-        // Control para alternar entre Mapa y Satélite
+        // Control nativo de capas de Leaflet (para cambiar entre mapa y satélite)
         const baseMaps = {
-            "Mapa": streetLayer,
-            "Satélite": satelliteLayer
+            "Mapa Calles": streetLayer,
+            "Satelital": satelliteLayer
         };
         L.control.layers(baseMaps, null, { position: 'topleft' }).addTo(map);
 
-        // Estilo del marcador de posición GPS
+        // Estilo del marcador para la ubicación GPS
         const userIcon = L.divIcon({
             className: 'custom-div-icon',
             html: `<div style="background-color: #2563eb; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
@@ -108,7 +105,7 @@
             iconAnchor: [9, 9]
         });
 
-        // Obtener Geolocalización GPS del usuario
+        // Obtenemos la posición GPS del usuario
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(position => {
                 const { latitude, longitude } = position.coords;
@@ -117,7 +114,7 @@
                 map.setView(userLocation, 16);
                 
                 L.marker(userLocation, { icon: userIcon }).addTo(map)
-                    .bindPopup("Tu ubicación actual")
+                    .bindPopup("Tu ubicación GPS")
                     .openPopup();
 
                 updateSelectedPoint(latitude, longitude);
@@ -126,13 +123,13 @@
             }, { enableHighAccuracy: true });
         }
 
-        // Selección de un punto al hacer clic en el mapa
+        // Selección de un punto haciendo clic sobre el mapa
         map.on('click', function(e) {
             const { lat, lng } = e.latlng;
             updateSelectedPoint(lat, lng);
         });
 
-        // Actualizar datos del punto seleccionado
+        // Función para actualizar coordenadas en pantalla y posicionar el marcador
         function updateSelectedPoint(lat, lng) {
             currentLat = lat.toFixed(6);
             currentLng = lng.toFixed(6);
@@ -148,17 +145,17 @@
             }
         }
 
-        // Centrar en la ubicación GPS
+        // Función del botón para volver a la posición GPS del usuario
         function recenterGPS() {
             if (userLocation) {
                 map.flyTo(userLocation, 16);
                 updateSelectedPoint(userLocation[0], userLocation[1]);
             } else {
-                alert("Ubicación GPS no disponible o falta autorización.");
+                alert("Ubicación GPS no disponible o no has otorgado permisos.");
             }
         }
 
-        // Copiar Coordenadas al Portapapeles
+        // Función para copiar coordenadas al portapapeles
         function copyCoordinates() {
             const textToCopy = `${currentLat}, ${currentLng}`;
             navigator.clipboard.writeText(textToCopy).then(() => {
