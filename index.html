@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS y Captura de Coordenadas</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <style>
+        #map {
+            height: 100vh;
+            width: 100vw;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans antialiased overflow-hidden">
+
+    <!-- Contenedor del Mapa -->
+    <div id="map"></div>
+
+    <!-- Panel Flotante de Coordenadas -->
+    <div class="fixed bottom-6 right-6 z-[1000] bg-white/95 backdrop-blur-md p-5 rounded-2xl shadow-2xl border border-gray-100 max-w-xs sm:max-w-sm w-full transition-all">
+        <h2 class="text-xs uppercase tracking-wider font-bold text-gray-400 mb-2">Punto Seleccionado</h2>
+        
+        <div class="space-y-1.5 mb-4">
+            <div class="flex justify-between items-center text-gray-700">
+                <span class="text-xs font-semibold">Latitud:</span>
+                <span id="lat" class="font-mono text-sm font-bold text-gray-900">-</span>
+            </div>
+            <div class="flex justify-between items-center text-gray-700">
+                <span class="text-xs font-semibold">Longitud:</span>
+                <span id="lng" class="font-mono text-sm font-bold text-gray-900">-</span>
+            </div>
+        </div>
+
+        <button id="copy-btn" onclick="copyCoordinates()" disabled
+            class="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-medium py-2.5 px-4 rounded-xl shadow-md transition-all duration-200 flex items-center justify-center space-x-2 text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+            </svg>
+            <span id="btn-text">Copiar Coordenadas</span>
+        </button>
+    </div>
+
+    <!-- Botón Flotante para Recentrar GPS -->
+    <button onclick="recenterGPS()" 
+        class="fixed top-6 right-6 z-[1000] bg-white p-3 rounded-full shadow-lg border border-gray-200 text-gray-700 hover:text-blue-600 hover:shadow-xl transition-all active:scale-95" 
+        title="Mi Ubicación GPS">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+    </button>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        // Coordenadas iniciales por defecto
+        let currentLat = -33.4489;
+        let currentLng = -70.6693;
+        let userLocation = null;
+        let activeMarker = null;
+
+        // Inicializar el mapa
+        const map = L.map('map', {
+            zoomControl: false
+        }).setView([currentLat, currentLng], 13);
+
+        // Control de Zoom
+        L.control.zoom({ position: 'topleft' }).addTo(map);
+
+        // Capa Mapa Estándar (CartoDB Voyager)
+        const streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20,
+            referrerPolicy: 'strict-origin-when-cross-origin'
+        });
+
+        // Capa Satelital (Esri World Imagery)
+        const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+            maxZoom: 18,
+            referrerPolicy: 'strict-origin-when-cross-origin'
+        });
+
+        // Añadir capa por defecto al mapa
+        streetLayer.addTo(map);
+
+        // Control para alternar entre Mapa y Satélite
+        const baseMaps = {
+            "Mapa": streetLayer,
+            "Satélite": satelliteLayer
+        };
+        L.control.layers(baseMaps, null, { position: 'topleft' }).addTo(map);
+
+        // Estilo del marcador de posición GPS
+        const userIcon = L.divIcon({
+            className: 'custom-div-icon',
+            html: `<div style="background-color: #2563eb; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></div>`,
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
+        });
+
+        // Obtener Geolocalización GPS del usuario
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(position => {
+                const { latitude, longitude } = position.coords;
+                userLocation = [latitude, longitude];
+                
+                map.setView(userLocation, 16);
+                
+                L.marker(userLocation, { icon: userIcon }).addTo(map)
+                    .bindPopup("Tu ubicación actual")
+                    .openPopup();
+
+                updateSelectedPoint(latitude, longitude);
+            }, error => {
+                console.warn("Acceso a GPS denegado o no disponible:", error.message);
+            }, { enableHighAccuracy: true });
+        }
+
+        // Selección de un punto al hacer clic en el mapa
+        map.on('click', function(e) {
+            const { lat, lng } = e.latlng;
+            updateSelectedPoint(lat, lng);
+        });
+
+        // Actualizar datos del punto seleccionado
+        function updateSelectedPoint(lat, lng) {
+            currentLat = lat.toFixed(6);
+            currentLng = lng.toFixed(6);
+
+            document.getElementById('lat').innerText = currentLat;
+            document.getElementById('lng').innerText = currentLng;
+            document.getElementById('copy-btn').disabled = false;
+
+            if (activeMarker) {
+                activeMarker.setLatLng([lat, lng]);
+            } else {
+                activeMarker = L.marker([lat, lng]).addTo(map);
+            }
+        }
+
+        // Centrar en la ubicación GPS
+        function recenterGPS() {
+            if (userLocation) {
+                map.flyTo(userLocation, 16);
+                updateSelectedPoint(userLocation[0], userLocation[1]);
+            } else {
+                alert("Ubicación GPS no disponible o falta autorización.");
+            }
+        }
+
+        // Copiar Coordenadas al Portapapeles
+        function copyCoordinates() {
+            const textToCopy = `${currentLat}, ${currentLng}`;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const btnText = document.getElementById('btn-text');
+                btnText.innerText = '¡Copiado!';
+                setTimeout(() => {
+                    btnText.innerText = 'Copiar Coordenadas';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
